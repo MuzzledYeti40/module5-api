@@ -1,4 +1,3 @@
-console.log("🔥 NEW DEPLOYMENT LOADED");
 const express = require("express");
 const { Pool } = require("pg");
 require("dotenv").config();
@@ -10,12 +9,16 @@ app.use(cors());
 app.use(express.json());
 
 /* ============================
-   PostgreSQL Connection
+   PostgreSQL Connection (FIXED FOR RENDER)
 ============================ */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
+/* Test DB connection */
 pool.connect((err, client, release) => {
   if (err) {
     console.error("❌ DB Connection Error:", err.message);
@@ -54,6 +57,7 @@ app.get("/menu", async (req, res) => {
     const result = await pool.query(query, values);
     res.json(result.rows);
   } catch (err) {
+    console.error("GET /menu error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -70,6 +74,7 @@ app.post("/menu", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
+    console.error("POST /menu error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -91,11 +96,12 @@ app.put("/menu/:id", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
+    console.error("PUT /menu error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-/* DELETE menu item (NEW) */
+/* DELETE menu item */
 app.delete("/menu/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -114,12 +120,13 @@ app.delete("/menu/:id", async (req, res) => {
       item: result.rows[0],
     });
   } catch (err) {
+    console.error("DELETE /menu error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 /* ============================
-   ORDERS ROUTES (NEW)
+   ORDERS ROUTES
 ============================ */
 
 /* CREATE order */
@@ -134,6 +141,7 @@ app.post("/orders", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
+    console.error("POST /orders error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -144,6 +152,7 @@ app.get("/orders", async (req, res) => {
     const result = await pool.query("SELECT * FROM orders ORDER BY id DESC");
     res.json(result.rows);
   } catch (err) {
+    console.error("GET /orders error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -165,6 +174,7 @@ app.put("/orders/:id", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
+    console.error("PUT /orders error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -175,5 +185,5 @@ app.put("/orders/:id", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
