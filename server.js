@@ -9,16 +9,17 @@ app.use(cors());
 app.use(express.json());
 
 /* ============================
-   PostgreSQL Connection (FIXED FOR RENDER)
+   PostgreSQL CONNECTION (FIXED FOR RENDER)
 ============================ */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false,
   },
+  connectionTimeoutMillis: 5000,
 });
 
-/* Test DB connection */
+/* Test DB connection on startup */
 pool.connect((err, client, release) => {
   if (err) {
     console.error("❌ DB Connection Error:", err.message);
@@ -29,17 +30,33 @@ pool.connect((err, client, release) => {
 });
 
 /* ============================
-   Root Route
+   ROOT ROUTE
 ============================ */
 app.get("/", (req, res) => {
   res.send("Food Delivery API is running 🍔");
 });
 
 /* ============================
+   DB TEST ROUTE (IMPORTANT DEBUG TOOL)
+============================ */
+app.get("/db-test", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+    res.json({
+      success: true,
+      time: result.rows[0],
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+/* ============================
    MENU ROUTES
 ============================ */
-
-/* GET all menu items */
 app.get("/menu", async (req, res) => {
   try {
     const { category } = req.query;
@@ -62,7 +79,6 @@ app.get("/menu", async (req, res) => {
   }
 });
 
-/* POST new menu item */
 app.post("/menu", async (req, res) => {
   try {
     const { name, price, category } = req.body;
@@ -79,7 +95,6 @@ app.post("/menu", async (req, res) => {
   }
 });
 
-/* PUT update menu item */
 app.put("/menu/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -101,7 +116,6 @@ app.put("/menu/:id", async (req, res) => {
   }
 });
 
-/* DELETE menu item */
 app.delete("/menu/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -128,8 +142,6 @@ app.delete("/menu/:id", async (req, res) => {
 /* ============================
    ORDERS ROUTES
 ============================ */
-
-/* CREATE order */
 app.post("/orders", async (req, res) => {
   try {
     const { item_name, quantity } = req.body;
@@ -146,7 +158,6 @@ app.post("/orders", async (req, res) => {
   }
 });
 
-/* GET all orders */
 app.get("/orders", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM orders ORDER BY id DESC");
@@ -157,7 +168,6 @@ app.get("/orders", async (req, res) => {
   }
 });
 
-/* UPDATE order status */
 app.put("/orders/:id", async (req, res) => {
   try {
     const { id } = req.params;
