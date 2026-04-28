@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 /* =========================
-   DB CONNECTION
+   DATABASE CONNECTION
 ========================= */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -18,21 +18,21 @@ const pool = new Pool({
   }
 });
 
-/* Test DB */
-pool.connect((err, client, release) => {
+pool.connect((err) => {
   if (err) {
     console.error("❌ DB Connection Error:", err.message);
   } else {
     console.log("✅ Connected to PostgreSQL");
-    release();
   }
 });
 
 /* =========================
-   ROOT
+   HEALTH CHECK
 ========================= */
 app.get("/", (req, res) => {
-  res.send("Food Delivery API is running 🍔");
+  res.json({
+    status: "Food Delivery API running 🍔"
+  });
 });
 
 /* =========================
@@ -67,6 +67,8 @@ app.get("/menu", async (req, res) => {
       values.push(restaurant_id);
     }
 
+    query += " ORDER BY id ASC";
+
     const result = await pool.query(query, values);
     res.json(result.rows);
   } catch (err) {
@@ -82,14 +84,16 @@ app.post("/menu", async (req, res) => {
     const { name, price, category, restaurant_id } = req.body;
 
     const result = await pool.query(
-      "INSERT INTO menu_items (name, price, category, restaurant_id) VALUES ($1,$2,$3,$4) RETURNING *",
+      `INSERT INTO menu_items (name, price, category, restaurant_id)
+       VALUES ($1,$2,$3,$4)
+       RETURNING *`,
       [name, price, category, restaurant_id]
     );
 
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({
-      error: "Failed to add item",
+      error: "Failed to add menu item",
       message: err.message
     });
   }
@@ -100,9 +104,19 @@ app.post("/menu", async (req, res) => {
 ========================= */
 app.get("/orders", async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM orders ORDER BY id DESC"
-    );
+    const { restaurant_id } = req.query;
+
+    let query = "SELECT * FROM orders";
+    const values = [];
+
+    if (restaurant_id) {
+      query += " WHERE restaurant_id = $1";
+      values.push(restaurant_id);
+    }
+
+    query += " ORDER BY created_at DESC";
+
+    const result = await pool.query(query, values);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({
@@ -114,11 +128,13 @@ app.get("/orders", async (req, res) => {
 
 app.post("/orders", async (req, res) => {
   try {
-    const { item_name, quantity } = req.body;
+    const { restaurant_id, item_name, quantity } = req.body;
 
     const result = await pool.query(
-      "INSERT INTO orders (item_name, quantity, status) VALUES ($1,$2,'pending') RETURNING *",
-      [item_name, quantity]
+      `INSERT INTO orders (restaurant_id, item_name, quantity, status)
+       VALUES ($1,$2,$3,'pending')
+       RETURNING *`,
+      [restaurant_id, item_name, quantity]
     );
 
     res.json(result.rows[0]);
