@@ -8,18 +8,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* ============================
-   PostgreSQL CONNECTION (FIXED FOR RENDER)
-============================ */
+/* =========================
+   DATABASE CONNECTION
+========================= */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false,
-  },
-  connectionTimeoutMillis: 5000,
+    rejectUnauthorized: false
+  }
 });
 
-/* Test DB connection on startup */
+/* Test DB connection */
 pool.connect((err, client, release) => {
   if (err) {
     console.error("❌ DB Connection Error:", err.message);
@@ -29,56 +28,35 @@ pool.connect((err, client, release) => {
   }
 });
 
-/* ============================
+/* =========================
    ROOT ROUTE
-============================ */
+========================= */
 app.get("/", (req, res) => {
   res.send("Food Delivery API is running 🍔");
 });
 
-/* ============================
-   DB TEST ROUTE (IMPORTANT DEBUG TOOL)
-============================ */
-app.get("/db-test", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT NOW()");
-    res.json({
-      success: true,
-      time: result.rows[0],
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: err.message,
-    });
-  }
-});
-
-/* ============================
+/* =========================
    MENU ROUTES
-============================ */
+========================= */
+
+//* GET menu items */
 app.get("/menu", async (req, res) => {
   try {
-    const { category } = req.query;
+    const result = await pool.query(
+      "SELECT * FROM menu_items ORDER BY id ASC"
+    );
 
-    let query = "SELECT * FROM menu_items";
-    const values = [];
-
-    if (category) {
-      query += " WHERE category = $1";
-      values.push(category);
-    }
-
-    query += " ORDER BY id ASC";
-
-    const result = await pool.query(query, values);
     res.json(result.rows);
   } catch (err) {
-    console.error("GET /menu error:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("MENU ERROR:", err);
+    res.status(500).json({
+      error: "Failed to fetch menu",
+      message: err.message
+    });
   }
 });
 
+/* POST new menu item */
 app.post("/menu", async (req, res) => {
   try {
     const { name, price, category } = req.body;
@@ -90,11 +68,14 @@ app.post("/menu", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("POST /menu error:", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: "Failed to add menu item",
+      message: err.message
+    });
   }
 });
 
+/* PUT update menu item */
 app.put("/menu/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -106,16 +87,19 @@ app.put("/menu/:id", async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Menu item not found" });
+      return res.status(404).json({ error: "Item not found" });
     }
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("PUT /menu error:", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: "Failed to update item",
+      message: err.message
+    });
   }
 });
 
+/* DELETE menu item */
 app.delete("/menu/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -126,22 +110,42 @@ app.delete("/menu/:id", async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Menu item not found" });
+      return res.status(404).json({ error: "Item not found" });
     }
 
     res.json({
-      message: "Menu item deleted successfully",
-      item: result.rows[0],
+      message: "Deleted successfully",
+      item: result.rows[0]
     });
   } catch (err) {
-    console.error("DELETE /menu error:", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: "Failed to delete item",
+      message: err.message
+    });
   }
 });
 
-/* ============================
-   ORDERS ROUTES
-============================ */
+/* =========================
+   ORDER ROUTES
+========================= */
+
+/* GET orders */
+app.get("/orders", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM orders ORDER BY id DESC"
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({
+      error: "Failed to fetch orders",
+      message: err.message
+    });
+  }
+});
+
+/* POST order */
 app.post("/orders", async (req, res) => {
   try {
     const { item_name, quantity } = req.body;
@@ -153,21 +157,14 @@ app.post("/orders", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("POST /orders error:", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: "Failed to create order",
+      message: err.message
+    });
   }
 });
 
-app.get("/orders", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM orders ORDER BY id DESC");
-    res.json(result.rows);
-  } catch (err) {
-    console.error("GET /orders error:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
+/* UPDATE order */
 app.put("/orders/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -184,14 +181,16 @@ app.put("/orders/:id", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("PUT /orders error:", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: "Failed to update order",
+      message: err.message
+    });
   }
 });
 
-/* ============================
+/* =========================
    START SERVER
-============================ */
+========================= */
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
